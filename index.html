@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Minigame 💎</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      font-size: 2.5em;
+      margin: 20px 0;
+      color: #00f2ff;
+    }
+    #game, #loginScreen {
+      display: none;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(6, 60px);
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      background: #333;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: 0.3s;
+    }
+    .cell:hover {
+      background: #555;
+    }
+    #score {
+      margin-top: 15px;
+      font-size: 18px;
+    }
+    #diamanteDisplay {
+      font-size: 50px;
+      margin-top: 20px;
+      color: #0ff;
+      display: none;
+    }
+    #timer {
+      font-size: 18px;
+      margin-top: 15px;
+      color: #ff5;
+    }
+    input[type="email"] {
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      margin-top: 20px;
+    }
+    button {
+      padding: 8px 15px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      background-color: #0ff;
+      color: black;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .explode {
+      background: red !important;
+      animation: explode 0.5s ease;
+    }
+    @keyframes explode {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.3); background: orange; }
+      100% { transform: scale(1); background: red; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Diamonds Blaze 💎</h1>
+
+  <div id="loginScreen">
+    <p>Digite seu e-mail para jogar:</p>
+    <input type="email" id="emailInput" placeholder="seuemail@email.com" required>
+    <button onclick="login()">Entrar</button>
+  </div>
+
+  <div id="game">
+    <div id="score">Acertos: 0 | Erros: 0</div>
+    <div id="timer"></div>
+    <div id="diamanteDisplay">💎</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const scoreDisplay = document.getElementById('score');
+    const diamanteDisplay = document.getElementById('diamanteDisplay');
+    const timerDisplay = document.getElementById('timer');
+    const emailInput = document.getElementById('emailInput');
+    const loginScreen = document.getElementById('loginScreen');
+    const game = document.getElementById('game');
+
+    let email = '';
+    let acertos = 0;
+    let erros = 0;
+    let bloqueadoAte = null;
+
+    function gerarGrid() {
+      grid.innerHTML = '';
+      const posicoes = Array(24).fill('bomba');
+      let colocados = 0;
+      while (colocados < 8) {
+        let i = Math.floor(Math.random() * 24);
+        if (posicoes[i] === 'bomba') {
+          posicoes[i] = 'diamante';
+          colocados++;
+        }
+      }
+
+      posicoes.forEach((valor, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.onclick = () => {
+          if (cell.clicked) return;
+          cell.clicked = true;
+          if (valor === 'diamante') {
+            acertos++;
+            cell.innerText = '💎';
+            mostrarDiamanteTemporario();
+          } else {
+            erros++;
+            cell.classList.add('explode');
+            setTimeout(() => cell.innerText = '💥', 300);
+          }
+          atualizarPlacar();
+          verificarFim();
+        };
+        grid.appendChild(cell);
+      });
+    }
+
+    function mostrarDiamanteTemporario() {
+      diamanteDisplay.style.display = 'block';
+      setTimeout(() => {
+        diamanteDisplay.style.display = 'none';
+      }, 5000);
+    }
+
+    function atualizarPlacar() {
+      scoreDisplay.innerText = `Acertos: ${acertos} | Erros: ${erros}`;
+    }
+
+    function verificarFim() {
+      if (erros >= 8) {
+        const espera = Date.now() + 3600000; // 1 hora
+        localStorage.setItem(`bloqueado_${email}`, espera);
+        bloquear(espera);
+      }
+    }
+
+    function bloquear(timestamp) {
+      game.style.display = 'none';
+      loginScreen.style.display = 'block';
+      atualizarContagem(timestamp);
+      const interval = setInterval(() => {
+        if (!atualizarContagem(timestamp)) {
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+
+    function atualizarContagem(timestamp) {
+      const agora = Date.now();
+      const restante = timestamp - agora;
+      if (restante <= 0) {
+        localStorage.removeItem(`bloqueado_${email}`);
+        timerDisplay.innerText = '';
+        return false;
+      }
+      const minutos = Math.floor(restante / 60000);
+      const segundos = Math.floor((restante % 60000) / 1000);
+      timerDisplay.innerText = `Você errou 8 vezes. Tente novamente em ${minutos}m ${segundos}s.`;
+      return true;
+    }
+
+    function login() {
+      email = emailInput.value.trim().toLowerCase();
+      if (!email) return alert('Digite um e-mail válido!');
+      const bloqueio = localStorage.getItem(`bloqueado_${email}`);
+      if (bloqueio && Date.now() < bloqueio) {
+        bloquear(Number(bloqueio));
+      } else {
+        iniciarJogo();
+      }
+    }
+
+    function iniciarJogo() {
+      acertos = 0;
+      erros = 0;
+      atualizarPlacar();
+      gerarGrid();
+      loginScreen.style.display = 'none';
+      game.style.display = 'block';
+      timerDisplay.innerText = '';
+    }
+
+    window.onload = () => {
+      loginScreen.style.display = 'block';
+    };
+  </script>
+</body>
+</html>
